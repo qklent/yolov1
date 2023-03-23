@@ -17,15 +17,17 @@ from utils import (
     cellboxes_to_boxes
 )
 from loss import YoloLoss
-#mAp doesn't work
+
+
 torch.manual_seed(123)
+
 
 LEARNING_RATE = 2e-5
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 16 #64
 WEIGHT_DECAY = 0
 EPOCHS = 100
-NUM_WORKERS = 0#2
+NUM_WORKERS = 2#2
 PIN_MEMORY = True
 LOAD_MODEL = True
 LOAD_MODEL_FILE = "overfit.pth.tar"
@@ -36,6 +38,8 @@ LABEL_DIR = "data/labels"
 #torch.normalize in trancforms.Compose()
 #torchvision.transforms.functional.normalize
 #self.darknet to imagenet?
+#torch.nn.optim шедулеры для оптимизации lr https://www.youtube.com/watch?v=6CvpMOO-DB4&ab_channel=DeepLearningSchool 33:30
+
 
 
 class Compose(object):
@@ -75,10 +79,10 @@ def main():
     loss_fn = YoloLoss()
     
     if LOAD_MODEL:
-        load_checkpoint(torch.load(LOAD_MODEL_FILE), model, optimizer)
+        load_checkpoint(torch.load(LOAD_MODEL_FILE,map_location=torch.device('cpu')), model, optimizer)
 
     train_dataset = VOCDataset(
-        "data/8examples.csv",
+        "data/train.csv",
         transform=transform,
         img_dir=IMG_DIR,
         label_dir=LABEL_DIR
@@ -110,15 +114,17 @@ def main():
     )
     
     for epoch in range(EPOCHS):
-        for x, y in train_loader:
-           x = x.to(DEVICE)
-           for idx in range(8):
-               bboxes = cellboxes_to_boxes(model(x))
-               bboxes = nms(bboxes[idx], iou_threshold=0.5, threshold=0.4, box_format="midpoint")
-               plot_image_with_boxes(x[idx].permute(1,2,0).to("cpu"), bboxes)
+        if LOAD_MODEL:
+            for x, y in train_loader:
+                x = x.to(DEVICE)
+                for idx in range(8):
+                    bboxes = cellboxes_to_boxes(model(x))
+                    bboxes = nms(bboxes[idx], iou_threshold=0.5, prob_threshold=0.5, box_format="midpoint")
+                    plot_image_with_boxes(x[idx].permute(1,2,0).to("cpu"), bboxes)
 
-           import sys
-           sys.exit()
+            import sys
+            sys.exit()
+            
         pred_boxes, target_boxes = get_bboxes(
             train_loader, model, iou_threshold=0.5, prob_threshold=0.4,device=DEVICE, box_format="midpoint"
         )
@@ -128,14 +134,14 @@ def main():
 
         print(f"train mAP: {mAP}")
 
-        if mean_average_precision > 0.9:
-           checkpoint = {
-               "state_dict": model.state_dict(),
-               "optimizer": optimizer.state_dict(),
-           }
-           save_checkpoint(checkpoint, filename=LOAD_MODEL_FILE)
-           import time
-           time.sleep(10)
+        # if mean_average_precision > 0.9:
+        #    checkpoint = {
+        #        "state_dict": model.state_dict(),
+        #        "optimizer": optimizer.state_dict(),
+        #    }
+        #    save_checkpoint(checkpoint, filename=LOAD_MODEL_FILE)
+        #    import time
+        #    time.sleep(10)
 
 
         train_fn(train_loader, model, optimizer, loss_fn)

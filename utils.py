@@ -3,7 +3,11 @@ from collections import Counter
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.axes import text
 #47 строка
+
+
+
 def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
     """Implement the intersection over union (IoU) between box1 and box2 
     
@@ -289,8 +293,11 @@ def plot_image_with_boxes(image, boxes):
     fig, ax = plt.subplots(1)
 
     ax.imshow(image)
+    
 
     for box in boxes:
+        num_of_class = box[0]
+        confidence = box[1]
         box = box[2:]
         assert len(box) == 4
         upper_left_x = box[0] - box[2] / 2
