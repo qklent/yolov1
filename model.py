@@ -49,7 +49,7 @@ class Yolov1(nn.Module):
 
     def forward(self, x):
         x = self.darknet(x)
-        return self.fcs(torch.flatten(x,start_dim=1)) ##start_dim = 1 as we don't want to flatten number of examples?????
+        return self.fcs(torch.flatten(x,start_dim=1)) ##start_dim = 1 as we don't want to flatten number of examples
     
     def _create_conv_layers(self, architecture):
         layers = []
@@ -99,13 +99,7 @@ class Yolov1(nn.Module):
         
         return nn.Sequential(*layers)
     
-    #https://miro.medium.com/v2/resize:fit:4800/format:webp/1*YG6heD55fEmZeUKRSlsqlA.png 1-5 bounding box(confidence,x,y,w,h), 
-    #                                                                                    6 - 10 box(same params),
-    #                                                                                    11-30 class probabilities
-    #                                                                                    why 7x7x30?:
-    #                                                                                               start image was divided into 7x7 parts(that's what YOLO algorithm is about) and each cell(of 7x7) has vector(lenght=30) that was described above
-    #https://miro.medium.com/v2/resize:fit:1400/format:webp/1*q5feieizWKYq7dpWjYvCOw.png
-                
+
     def _create_fcs(self, split_size, num_boxes, num_classes):
         S, B, C = split_size, num_boxes, num_classes
         return nn.Sequential(

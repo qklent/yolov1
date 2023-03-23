@@ -5,6 +5,17 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 #47 строка
 def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
+    """Implement the intersection over union (IoU) between box1 and box2 
+    
+    Parameters:
+        boxes_preds (torch.tensor) -- (BATCH_SIZE, 4) list of predicted bboxes
+        boxes_labels (torch.tensor) -- (BATCH_SIZE, 4) list of predicted bboxes
+        box_format (str) -- "midpoint"/"corners" if boxes (x, y, width, height) or (x1, y1, x2, y2)
+                                                         x, y -- center coords
+                                                         x1, y1 -- up left coords
+                                                         x2, y2 -- bottom right coords
+    return iou (torch.tensor) -- (BATCH_SIZE) list of intersection over union for all bboxes in batch
+    """
     if box_format == "midpoint":
         box1_x1 = boxes_preds[..., 0:1] - boxes_preds[..., 2:3] / 2
         box1_y1 = boxes_preds[..., 1:2] - boxes_preds[..., 3:4] / 2
@@ -38,11 +49,26 @@ def intersection_over_union(boxes_preds, boxes_labels, box_format="midpoint"):
 
 
 def nms(
-        bboxes, #[num_class, prob_of_this_class, x1, y1, x2, y2]
+        bboxes, 
         iou_threshold,
         prob_threshold,
         box_format="corners"
 ):
+    """
+    implementation of non-maximum suppression algorithm i.e. takes the bbox with highest probability for each object
+
+    Parameters:
+        bboxes (list) -- list of lists containing bboxes specified as [num_class, prob_of_this_class, x1, y1, x2, y2]
+        iou_threshold (int) -- intersection over union threshold
+        prob_threshold (int) -- probability threshold
+        box_format (str) -- "midpoint"/"corners" if boxes (x, y, width, height) or (x1, y1, x2, y2)
+                                                         x, y -- center coords
+                                                         x1, y1 -- up left coords
+                                                         x2, y2 -- bottom right coords
+
+    return list of lists with bboxes
+
+    """
     assert type(bboxes) == list
     # вероятности настолько мелкие, что не могут пройти порог
     bboxes = [box for box in bboxes if box[1] > prob_threshold]
@@ -67,12 +93,26 @@ def nms(
 
 
 def mean_average_precision(
-        pred_boxes, #list: [[train_index, class_pred, prob_score, x1, x2, y1, y2], ...] train_index-num of image this bbox comes from
+        pred_boxes,
         true_boxes,
         iou_threshold=0.5,
         box_format="corners",
         num_classes=20
 ):
+    """
+    implementation of mean average precision metric
+    
+    Parameters:
+        pred_boxes (list) list of lists [[train_index, class_pred, prob_score, x1, x2, y1, y2], ...] train_index - number  of image this bbox comes from
+        true boxes (list) list of lists with target bboxes
+        iou_threshold (int) -- intersection over union threshold
+        box_format (str) -- "midpoint"/"corners" if boxes (x, y, width, height) or (x1, y1, x2, y2)
+                                                    x, y -- center coords
+                                                    x1, y1 -- up left coords
+                                                    x2, y2 -- bottom right coords
+        num_classes (int) -- number of classes
+    return mean_average_precision for certain interesction over union threshold
+    """
     average_precision = []
 
     for c in range(num_classes):
@@ -135,32 +175,6 @@ def mean_average_precision(
     return sum(average_precision) / len(average_precision)
 
 
-def plot_image_with_boxes(image, boxes):
-    image = np.array(image)
-    height, width, _ = image.shape
-
-    fig, ax = plt.subplots(1)
-
-    ax.imshow(image)
-
-    for box in boxes:
-        box = box[2:]
-        assert len(box) == 4
-        upper_left_x = box[0] - box[2] / 2
-        upper_left_y = box[1] - box[3] / 2
-        rect = patches.Rectangle(
-            (upper_left_x * width, upper_left_y * height),
-            box[2] * width,
-            box[3] * height,
-            linewidth=1,
-            edgecolor="r",
-            facecolor="none",
-        )
-        # Add the patch to the Axes
-        ax.add_patch(rect)
-
-    plt.show()
-
 
 def get_bboxes(
     loader,
@@ -171,6 +185,10 @@ def get_bboxes(
     box_format="midpoint",
     device="cuda",
 ):
+    """
+    return all pred bboxes and all target bboxes
+    """
+    
     all_pred_boxes = []
     all_true_boxes = []
 
@@ -210,9 +228,18 @@ def get_bboxes(
 
 
 def convert_cellboxes(predictions, S=7):
+    """
+    convert cell's x, y, width, height coords to image's x, y, width, height
+        Parameters:
+            S (int) -- image's split size
+            predictions (tensor) -- shape = (number_of_examples, S * S * (C + B * 5)) 
+                where C -- number of classes, B -- numbrer of bboxess
+    return tensor with shape(batch_size, S, S, 5) where S -- image's split size 
+            and last dim -- [predicted_class, confidence, image's x, image's y, image's width, image's height]
+    """
     predictions = predictions.to("cpu")
     batch_size = predictions.shape[0]
-    predictions = predictions.reshape(batch_size, 7, 7, 30)
+    predictions = predictions.reshape(batch_size, S, S, 30)
     bboxes1 = predictions[..., 21:25]
     bboxes2 = predictions[..., 26:30]
     scores = torch.cat(
@@ -235,18 +262,51 @@ def convert_cellboxes(predictions, S=7):
 
 
 def cellboxes_to_boxes(out, S=7):
+    """
+
+    """
     converted_pred = convert_cellboxes(out).reshape(out.shape[0], S * S, -1)
     converted_pred[..., 0] = converted_pred[..., 0].long()
     all_bboxes = []
 
-    for ex_idx in range(out.shape[0]):
+    for ex_index in range(out.shape[0]):
         bboxes = []
 
-        for bbox_idx in range(S * S):
-            bboxes.append([x.item() for x in converted_pred[ex_idx, bbox_idx, :]])
+        for bbox_index in range(S * S):
+            bboxes.append([x.item() for x in converted_pred[ex_index, bbox_index, :]])
         all_bboxes.append(bboxes)
 
     return all_bboxes
+
+
+def plot_image_with_boxes(image, boxes):
+    """
+    plots predicted bboxes on the image
+    """
+    image = np.array(image)
+    height, width, _ = image.shape
+
+    fig, ax = plt.subplots(1)
+
+    ax.imshow(image)
+
+    for box in boxes:
+        box = box[2:]
+        assert len(box) == 4
+        upper_left_x = box[0] - box[2] / 2
+        upper_left_y = box[1] - box[3] / 2
+        rect = patches.Rectangle(
+            (upper_left_x * width, upper_left_y * height),
+            box[2] * width,
+            box[3] * height,
+            linewidth=1,
+            edgecolor="r",
+            facecolor="none",
+        )
+        # Add the patch to the Axes
+        ax.add_patch(rect)
+
+    plt.show()
 
 
 def save_checkpoint(state, filename="my_checkpoint.pth.tar"):
