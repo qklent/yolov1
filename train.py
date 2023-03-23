@@ -21,7 +21,7 @@ from loss import YoloLoss
 torch.manual_seed(123)
 
 LEARNING_RATE = 2e-5
-DEVICE = "cude" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 16 #64
 WEIGHT_DECAY = 0
 EPOCHS = 100
