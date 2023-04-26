@@ -1,2 +1,2 @@
 # yolov1 from scratch
-![cactus2](https://user-images.githubusercontent.com/108892460/234630067-c66f5e57-4e95-4954-8a14-9b65d59ea546.png)
+![image](https://user-images.githubusercontent.com/108892460/234630573-3a8111a0-da39-41e9-b8c0-3829de7ca12f.png)
